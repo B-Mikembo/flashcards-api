@@ -1,0 +1,93 @@
+name: "run tests & deploy to test"
+
+on:
+  pull_request:
+    types: [ opened, synchronize, reopened ]
+    branches: [ main ]
+
+env:
+  IMAGE_NAME: flashcards-api-test
+
+concurrency:
+  group: ci-deploy-rc-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rc-test:
+    if: contains(toJSON(github.head_ref), 'release/') || contains(toJSON(github.head_ref), 'hotfix/')
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Setup
+      - uses: actions/checkout@v4
+      - name: Set up JDK
+        uses: actions/setup-java@v3.13.0
+        with:
+          distribution: 'liberica'
+          java-version: '21'
+          cache: 'maven'
+
+      # 2. Test
+      - name: Run Tests
+        run: mvn clean verify --no-transfer-progress
+
+  rc-deploy:
+    needs: [ rc-test ]
+    runs-on: ubuntu-latest
+    environment: test
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    steps:
+      # 1. Setup
+      - uses: actions/checkout@v4
+      - name: Set up JDK
+        uses: actions/setup-java@v3.13.0
+        with:
+          distribution: 'liberica'
+          java-version: '21'
+          cache: 'maven'
+
+      # 2. Sets & print variables
+      - name: Sets variables
+        id: variables
+        run: |
+          git fetch --prune --prune-tags origin
+          
+          # 1. Get tags
+          LATEST_TAG=$(git describe --tags "$(git rev-list --tags --max-count=1)")
+          TAG_LIST=($(echo $LATEST_TAG | tr '.' ' '))
+          [[ "${#TAG_LIST[@]}" -ne 2 ]] && echo "$RELEASE_VERSION is not a valid version" && exit 1
+          
+          # 2. Set release version
+          if [[ "$GITHUB_HEAD_REF" == release* ]]
+          then
+            RELEASE_VERSION=$(( TAG_LIST[0] + 1 )).0;
+          else
+            RELEASE_VERSION=${TAG_LIST[0]}.$(( TAG_LIST[1] + 1));
+          fi
+          
+          # 3. Set vars
+          IMAGE_REGISTRY="docker.io/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}"
+          IMAGE_TAG=${RELEASE_VERSION}-$(git rev-parse --short=4 HEAD)-rc
+          
+          # 4. Set vars as env
+          echo "IMAGE_REGISTRY=$IMAGE_REGISTRY" >> $GITHUB_ENV
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+
+      - name: Print variables
+        run: |
+          echo "IMAGE_TAG=$IMAGE_TAG"
+          echo "IMAGE_REGISTRY=$IMAGE_REGISTRY"
+
+      # 3. Auth to Docker Hub
+      - name: Log in to Docker Hub
+        run: echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+
+      # 4. Build image with Maven
+      - name: Build image
+        run: mvn clean package -DskipTests spring-boot:build-image --no-transfer-progress -Dspring-boot.build-image.imageName=$IMAGE_REGISTRY:$IMAGE_TAG
+
+      # 5. Push image
+      - name: Push image
+        run: docker push $IMAGE_REGISTRY:$IMAGE_TAG
