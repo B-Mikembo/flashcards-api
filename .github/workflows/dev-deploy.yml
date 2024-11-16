@@ -28,7 +28,7 @@ jobs:
       - name: Sets variables
         id: variables
         run: |
-          IMAGE_REGISTRY="docker.io/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}
+          IMAGE_REGISTRY="docker.io/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}"
           IMAGE_TAG=dev-${{ github.run_number }}
           
           echo "IMAGE_REGISTRY=$IMAGE_REGISTRY" >> $GITHUB_ENV
