@@ -11,6 +11,7 @@
 
     <modules>
         <module>flashcards-api-infrastructure</module>
+        <module>flashcards-api-application</module>
     </modules>
 
     <properties>
