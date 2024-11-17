@@ -1,7 +1,7 @@
 package com.github.brice.flashcards_api.adapter.in.rest;
 
-import com.github.brice.flashcards_api.adapter.in.rest.re.FlashcardResponse;
 import com.github.brice.flashcards_api.adapter.in.rest.resource.FlashcardRequest;
+import com.github.brice.flashcards_api.adapter.in.rest.resource.FlashcardResponse;
 import com.github.brice.flashcards_api.application.in.ManagingFlashcards;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
